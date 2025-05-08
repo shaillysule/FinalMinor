@@ -27,9 +27,9 @@ const StockDashboard = () => {
         const headers = { 'x-auth-token': token };
 
         const [stocksResponse, indicesResponse, trendingResponse] = await Promise.all([
-          axios.get('http://localhost:5000/api/stocks', { headers }), // Matches /api/stocks
-          axios.get('http://localhost:5000/api/stocks/indices/market', { headers }), // Fixed to match /api/stocks/indices/market
-          axios.get('http://localhost:5000/api/stocks/trending/stocks', { headers }) // Fixed to match /api/stocks/trending/stocks
+          axios.get('http://localhost:5000/api/stocks', { headers }),
+          axios.get('http://localhost:5000/api/stocks/indices/market', { headers }),
+          axios.get('http://localhost:5000/api/stocks/trending/stocks', { headers })
         ]);
 
         setStockData(stocksResponse.data);
@@ -54,7 +54,10 @@ const StockDashboard = () => {
     <StockCard
       key={stock.symbol}
       stock={stock}
-      onClick={() => window.location.href = `/stock/${stock.symbol}`}
+      onClick={() => {
+        console.log('Navigating to stock:', stock.symbol);
+        window.location.href = `/stock/${stock.symbol.toUpperCase()}`; // Normalize to uppercase
+      }}
     />
   );
 
@@ -73,11 +76,7 @@ const StockDashboard = () => {
           <div className="app-logo"></div>
           <h1>Stocks</h1>
         </div>
-        <div className="header-actions">
-          <button className="search-button">🔍</button>
-          <button className="grid-button">⊞</button>
-          <div className="profile-circle"></div>
-        </div>
+        
       </div>
 
       <div className="market-indices">
@@ -115,7 +114,6 @@ const StockDashboard = () => {
         <>
           <div className="section-header">
             <h2>Stocks in news</h2>
-            <button className="see-more">See more</button>
           </div>
 
           <div className="stocks-grid">
@@ -166,7 +164,6 @@ const StockDashboard = () => {
               .map(renderStockCard)}
             <div className="stock-card see-more-card">
               <div className="see-more-content">
-                <span>See more ›</span>
                 <div className="see-more-label">{activeSection === 'gainers' ? 'Gainers' : 'Losers'}</div>
               </div>
             </div>
@@ -174,7 +171,6 @@ const StockDashboard = () => {
 
           <div className="section-header">
             <h2>Most traded</h2>
-            <button className="see-more">See more</button>
           </div>
 
           <div className="stocks-grid">
@@ -189,52 +185,9 @@ const StockDashboard = () => {
             {stockData.slice(0, 4).map(renderStockCard)}
           </div>
 
-          <div className="product-tools">
-            <h2>Product & tools</h2>
-            <div className="tools-grid">
-              <div className="tool-card">
-                <div className="tool-icon">F&O</div>
-                <div className="tool-name">F&O</div>
-              </div>
-              <div className="tool-card">
-                <div className="tool-icon">📅</div>
-                <div className="tool-name">Events</div>
-              </div>
-              <div className="tool-card">
-                <div className="tool-icon">📢</div>
-                <div className="tool-name">IPO</div>
-              </div>
-              <div className="tool-card">
-                <div className="tool-icon">🔍</div>
-                <div className="tool-name">All Stocks</div>
-              </div>
-            </div>
-          </div>
+          <div className="product-tools"></div>
         </>
       )}
-
-      <div className="account-message">
-        <p>Prices will be live after stocks account is active.</p>
-      </div>
-
-      <div className="bottom-navigation">
-        <button className="nav-button active">
-          <div className="nav-icon">📈</div>
-          <span>Stocks</span>
-        </button>
-        <button className="nav-button">
-          <div className="nav-icon">📊</div>
-          <span>F&O</span>
-        </button>
-        <button className="nav-button">
-          <div className="nav-icon">💰</div>
-          <span>Mutual Funds</span>
-        </button>
-        <button className="nav-button">
-          <div className="nav-icon">💸</div>
-          <span>UPI</span>
-        </button>
-      </div>
     </div>
   );
 };

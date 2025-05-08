@@ -13,6 +13,7 @@ const StockDetail = () => {
   const [takeProfit, setTakeProfit] = useState("");
   const [stopLoss, setStopLoss] = useState("");
 
+  // Updated useEffect in stockDetail.js to handle API rate limits better
   useEffect(() => {
     const fetchStockDetail = async () => {
       try {
@@ -24,20 +25,77 @@ const StockDetail = () => {
           navigate('/');
           return;
         }
-
-        const headers = {
-          'x-auth-token': token
-        };
-
-        const stockResponse = await axios.get(`http://localhost:5000/api/stocks/${symbol}`, { headers });
-        setStock(stockResponse.data || {});
-
-        const historyResponse = await axios.get(`http://localhost:5000/api/stocks/${symbol}/history?interval=${interval}`, { headers });
-        setChartData({
-          dates: historyResponse.data.dates || [],
-          prices: historyResponse.data.prices || [],
-        });
-
+  
+        const headers = { 'x-auth-token': token };
+        const normalizedSymbol = symbol.toUpperCase(); // Normalize to uppercase
+        console.log('Fetching stock details for:', normalizedSymbol);
+  
+        // Use cached data if available
+        const cachedStockData = sessionStorage.getItem(`stock_${normalizedSymbol}`);
+        const cachedHistoryData = sessionStorage.getItem(`history_${normalizedSymbol}_${interval}`);
+        
+        let stockData, historyData;
+        
+        // Attempt to fetch new stock data or use cached data
+        try {
+          const stockResponse = await axios.get(
+            `http://localhost:5000/api/stocks/${normalizedSymbol}`, 
+            { headers }
+          );
+          console.log('Stock response:', stockResponse.data);
+          stockData = stockResponse.data || {};
+          
+          // Cache the new data
+          if (stockData && Object.keys(stockData).length > 0) {
+            sessionStorage.setItem(`stock_${normalizedSymbol}`, JSON.stringify(stockData));
+          }
+        } catch (stockError) {
+          console.warn("Error fetching stock data, using cached data if available:", stockError);
+          
+          // Use cached data if available
+          if (cachedStockData) {
+            console.log("Using cached stock data");
+            stockData = JSON.parse(cachedStockData);
+          } else {
+            throw stockError; // Re-throw if no cached data
+          }
+        }
+        
+        // Attempt to fetch history data or use cached data
+        try {
+          const historyResponse = await axios.get(
+            `http://localhost:5000/api/stocks/${normalizedSymbol}/history?interval=${interval}`, 
+            { headers }
+          );
+          console.log('History response:', historyResponse.data);
+          historyData = {
+            dates: historyResponse.data.dates || [],
+            prices: historyResponse.data.prices || [],
+          };
+          
+          // Cache the new data
+          if (historyData.dates.length > 0 && historyData.prices.length > 0) {
+            sessionStorage.setItem(`history_${normalizedSymbol}_${interval}`, JSON.stringify(historyData));
+          }
+        } catch (historyError) {
+          console.warn("Error fetching history data, using cached data if available:", historyError);
+          
+          // Use cached data if available
+          if (cachedHistoryData) {
+            console.log("Using cached history data");
+            historyData = JSON.parse(cachedHistoryData);
+          } else {
+            // If we have stock data but no history data, don't throw an error
+            // Just provide empty arrays for the chart
+            historyData = { dates: [], prices: [] };
+            console.warn("No cached history data available");
+          }
+        }
+        
+        // Update state with fetched or cached data
+        setStock(stockData);
+        setChartData(historyData);
+        
         setLoading(false);
         setError(null);
       } catch (error) {
@@ -50,10 +108,9 @@ const StockDetail = () => {
         setLoading(false);
       }
     };
-
+  
     fetchStockDetail();
   }, [symbol, interval, navigate]);
-
   const handleBuyStock = async () => {
     try {
       if (!stock.latestPrice) {
@@ -71,15 +128,13 @@ const StockDetail = () => {
       const response = await axios.post(
         "http://localhost:5000/api/portfolio/buy",
         {
-          symbol,
+          symbol: symbol.toUpperCase(),
           price: stock.latestPrice,
           takeProfit,
           stopLoss,
         },
         {
-          headers: {
-            'x-auth-token': token,
-          },
+          headers: { 'x-auth-token': token },
         }
       );
 
@@ -104,14 +159,16 @@ const StockDetail = () => {
           return;
         }
 
-        const headers = {
-          'x-auth-token': token
-        };
+        const headers = { 'x-auth-token': token };
+        const normalizedSymbol = symbol.toUpperCase();
+        console.log('Refreshing stock details for:', normalizedSymbol);
 
-        const stockResponse = await axios.get(`http://localhost:5000/api/stocks/${symbol}`, { headers });
+        const stockResponse = await axios.get(`http://localhost:5000/api/stocks/${normalizedSymbol}`, { headers });
+        console.log('Stock response:', stockResponse.data);
         setStock(stockResponse.data || {});
 
-        const historyResponse = await axios.get(`http://localhost:5000/api/stocks/${symbol}/history?interval=${interval}`, { headers });
+        const historyResponse = await axios.get(`http://localhost:5000/api/stocks/${normalizedSymbol}/history?interval=${interval}`, { headers });
+        console.log('History response:', historyResponse.data);
         setChartData({
           dates: historyResponse.data.dates || [],
           prices: historyResponse.data.prices || [],
@@ -131,73 +188,92 @@ const StockDetail = () => {
     fetchStockDetail();
   };
 
-  const LineChart = ({ data, labels }) => {
-    if (!data || data.length === 0) return <div>No chart data available</div>;
+  // Updated LineChart component for stockDetail.js
+const LineChart = ({ data, labels }) => {
+  // Handle empty data cases
+  if (!data || data.length === 0 || !labels || labels.length === 0) {
+    return <div className="text-white">No chart data available</div>;
+  }
 
-    const width = 800;
-    const height = 300;
-    const padding = 40;
-    
-    const minValue = Math.min(...data);
-    const maxValue = Math.max(...data);
-    
-    const getX = (index) => padding + (index * (width - 2 * padding)) / (data.length - 1);
-    const getY = (value) => height - padding - ((value - minValue) * (height - 2 * padding)) / (maxValue - minValue);
-    
-    let path = "";
-    data.forEach((value, index) => {
-      if (index === 0) {
-        path += `M ${getX(index)} ${getY(value)} `;
-      } else {
-        path += `L ${getX(index)} ${getY(value)} `;
-      }
-    });
-
+  // Handle single data point case
+  if (data.length === 1) {
     return (
-      <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMidYMid meet">
-        <line x1={padding} y1={height - padding} x2={width - padding} y2={height - padding} stroke="#444" strokeWidth="1" />
-        <line x1={padding} y1={height - padding} x2={padding} y2={padding} stroke="#444" strokeWidth="1" />
-        
-        <text x={padding - 10} y={padding} textAnchor="end" fill="#aaa" fontSize="12">{maxValue.toFixed(2)}</text>
-        <text x={padding - 10} y={height - padding} textAnchor="end" fill="#aaa" fontSize="12">{minValue.toFixed(2)}</text>
-        
-        {labels && labels.length > 0 && (
-          <>
-            <text x={padding} y={height - padding + 20} textAnchor="middle" fill="#aaa" fontSize="12">{labels[0]}</text>
-            {labels.length > 2 && (
-              <text 
-                x={getX(Math.floor(labels.length / 2))} 
-                y={height - padding + 20} 
-                textAnchor="middle" 
-                fill="#aaa" 
-                fontSize="12"
-              >
-                {labels[Math.floor(labels.length / 2)]}
-              </text>
-            )}
+      <div className="text-white">
+        Only one data point available: {labels[0]} - {data[0].toFixed(2)}
+      </div>
+    );
+  }
+
+  const width = 800;
+  const height = 300;
+  const padding = 40;
+  
+  const minValue = Math.min(...data);
+  const maxValue = Math.max(...data);
+  
+  // Ensure we have a range to plot
+  const valueRange = maxValue - minValue;
+  const yMin = valueRange === 0 ? minValue - minValue * 0.05 : minValue;
+  const yMax = valueRange === 0 ? maxValue + maxValue * 0.05 : maxValue;
+  
+  const getX = (index) => padding + (index * (width - 2 * padding)) / (data.length - 1);
+  const getY = (value) => height - padding - ((value - yMin) * (height - 2 * padding)) / (yMax - yMin || 1); // Prevent division by zero
+  
+  let path = "";
+  data.forEach((value, index) => {
+    if (index === 0) {
+      path += `M ${getX(index)} ${getY(value)} `;
+    } else {
+      path += `L ${getX(index)} ${getY(value)} `;
+    }
+  });
+
+  return (
+    <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMidYMid meet">
+      <line x1={padding} y1={height - padding} x2={width - padding} y2={height - padding} stroke="#444" strokeWidth="1" />
+      <line x1={padding} y1={height - padding} x2={padding} y2={padding} stroke="#444" strokeWidth="1" />
+      
+      <text x={padding - 10} y={padding} textAnchor="end" fill="#aaa" fontSize="12">{yMax.toFixed(2)}</text>
+      <text x={padding - 10} y={height - padding} textAnchor="end" fill="#aaa" fontSize="12">{yMin.toFixed(2)}</text>
+      
+      {labels && labels.length > 0 && (
+        <>
+          <text x={padding} y={height - padding + 20} textAnchor="middle" fill="#aaa" fontSize="12">{labels[0]}</text>
+          {labels.length > 2 && (
             <text 
-              x={getX(labels.length - 1)} 
+              x={getX(Math.floor(labels.length / 2))} 
               y={height - padding + 20} 
               textAnchor="middle" 
               fill="#aaa" 
               fontSize="12"
             >
-              {labels[labels.length - 1]}
+              {labels[Math.floor(labels.length / 2)]}
             </text>
-          </>
-        )}
-        
-        <path d={path} fill="none" stroke="#4CAF50" strokeWidth="2" />
-        {data.map((value, index) => (
-          <circle 
-            key={index} 
-            cx={getX(index)} 
-            cy={getY(value)} 
-            r="3" 
-            fill="#4CAF50" 
-          />
-        ))}
-      </svg>
+          )}
+          <text 
+            x={getX(labels.length - 1)} 
+            y={height - padding + 20} 
+            textAnchor="middle" 
+            fill="#aaa" 
+            fontSize="12"
+          >
+            {labels[labels.length - 1]}
+          </text>
+        </>
+      )}
+      
+      <path d={path} fill="none" stroke="#4CAF50" strokeWidth="2" />
+      {data.map((value, index) => (
+        <circle 
+          key={index} 
+          cx={getX(index)} 
+          cy={getY(value)} 
+          r="3" 
+          fill="#4CAF50" 
+        />
+      ))}
+    </svg>
+  
     );
   };
 
@@ -205,6 +281,14 @@ const StockDetail = () => {
     return (
       <div className="bg-black min-h-screen text-white p-6 flex items-center justify-center">
         <div className="text-xl">Loading stock data...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-black min-h-screen text-white p-6 flex items-center justify-center">
+        <div className="text-xl text-red-500">{error}</div>
       </div>
     );
   }
@@ -246,7 +330,7 @@ const StockDetail = () => {
               1D
             </button>
             <button 
-              className={`px-3 py-1 rounded ${interval === 'weekly' ? 'bg-green-600' : 'bg-gray-800'}`}
+              className={`px-3 py-1 rounded ${interval === 'weekly' ? 'bg-green-600' : ' Schild-gray-800'}`}
               onClick={() => setInterval('weekly')}
             >
               1W

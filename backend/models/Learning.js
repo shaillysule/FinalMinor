@@ -1,27 +1,25 @@
 const mongoose = require('mongoose');
 
-const LearningSchema = new mongoose.Schema({
-  question: {
-    type: String,
-    required: true
-  },
-  answer: {
-    type: String,
-    required: true
-  },
-  helpful: {
-    type: Boolean,
-    default: null
-  },
+const learningSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true
   },
-  createdAt: {
-    type: Date,
-    default: Date.now
-  }
-});
+  challengesCompleted: {
+    type: Number,
+    default: 0
+  },
+  quizScore: {
+    type: Number,
+    default: 0
+  },
+  completedModules: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'LearningModule'
+    }
+  ]
+}, { timestamps: true });
 
-module.exports = mongoose.model('Learning', LearningSchema);
+module.exports = mongoose.model('Learning', learningSchema);

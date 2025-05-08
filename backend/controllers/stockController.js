@@ -18,10 +18,10 @@ exports.getStocks = async (req, res) => {
           const response = await axios.get(
             `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${API_KEY}`
           );
+          console.log(`Quote response for ${symbol}:`, response.data);
           
           const quote = response.data['Global Quote'];
           
-          // If no data was returned for this symbol
           if (!quote || Object.keys(quote).length === 0) {
             return {
               symbol,
@@ -34,7 +34,7 @@ exports.getStocks = async (req, res) => {
           
           return {
             symbol,
-            companyName: symbol, // You'll need company overview to get actual name
+            companyName: symbol,
             latestPrice: quote['05. price'],
             changePercent: quote['10. change percent'],
           };
@@ -61,13 +61,14 @@ exports.getStocks = async (req, res) => {
 // Get details for a specific stock
 exports.getStockBySymbol = async (req, res) => {
   const { symbol } = req.params;
+  const normalizedSymbol = symbol.toUpperCase(); // Normalize to uppercase
   
-  if (!symbol) {
+  if (!normalizedSymbol) {
     return res.status(400).json({ error: 'Stock symbol is required' });
   }
   
   try {
-    console.log("Getting stock detail for:", symbol);
+    console.log("Getting stock detail for:", normalizedSymbol);
     
     if (!API_KEY) {
       return res.status(500).json({ error: 'API key is missing' });
@@ -75,30 +76,48 @@ exports.getStockBySymbol = async (req, res) => {
 
     // Get company overview
     const overviewResponse = await axios.get(
-      `https://www.alphavantage.co/query?function=OVERVIEW&symbol=${symbol}&apikey=${API_KEY}`
+      `https://www.alphavantage.co/query?function=OVERVIEW&symbol=${normalizedSymbol}&apikey=${API_KEY}`
     );
-    
+    console.log(`Overview response for ${normalizedSymbol}:`, overviewResponse.data);
     const overview = overviewResponse.data;
 
     // Get current quote
     const quoteResponse = await axios.get(
-      `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${API_KEY}`
+      `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${normalizedSymbol}&apikey=${API_KEY}`
     );
+    console.log(`Quote response for ${normalizedSymbol}:`, quoteResponse.data);
     const quote = quoteResponse.data['Global Quote'];
 
-    // If no quote data was returned
-    if (!quote || Object.keys(quote).length === 0) {
-      return res.status(404).json({ error: 'Stock data not found' });
+    // If no data was returned
+    if (!quote || Object.keys(quote).length === 0 || !overview || Object.keys(overview).length === 0) {
+      return res.status(200).json({
+        symbol: normalizedSymbol,
+        name: normalizedSymbol,
+        description: `No data available for ${normalizedSymbol}`,
+        latestPrice: '0.00',
+        changePercent: '0.00%',
+        dayHigh: 'N/A',
+        dayLow: 'N/A',
+        yearHigh: 'N/A',
+        yearLow: 'N/A',
+        sector: 'N/A',
+        industry: 'N/A',
+        marketCap: 'N/A',
+        peRatio: 'N/A',
+        dividendYield: 'N/A',
+        eps: 'N/A',
+        error: 'Stock data not found'
+      });
     }
 
     res.json({
-      symbol,
-      name: overview.Name || symbol,
-      description: overview.Description || `No description available for ${symbol}`,
+      symbol: normalizedSymbol,
+      name: overview.Name || normalizedSymbol,
+      description: overview.Description || `No description available for ${normalizedSymbol}`,
       latestPrice: quote['05. price'] || '0.00',
       changePercent: quote['10. change percent'] || '0.00%',
-      dayHigh: overview['52WeekHigh'] || 'N/A', // Alpha Vantage doesn't provide day high in these endpoints
-      dayLow: overview['52WeekLow'] || 'N/A',   // Alpha Vantage doesn't provide day low in these endpoints
+      dayHigh: overview['52WeekHigh'] || 'N/A',
+      dayLow: overview['52WeekLow'] || 'N/A',
       yearHigh: overview['52WeekHigh'] || 'N/A',
       yearLow: overview['52WeekLow'] || 'N/A',
       sector: overview.Sector || 'N/A',
@@ -114,23 +133,22 @@ exports.getStockBySymbol = async (req, res) => {
   }
 };
 
-// Get historical data for a stock
 exports.getStockHistory = async (req, res) => {
   const { symbol } = req.params;
-  const { interval = 'daily' } = req.query; // daily, weekly, monthly
+  const normalizedSymbol = symbol.toUpperCase(); // Normalize to uppercase
+  const { interval = 'daily' } = req.query;
   
-  if (!symbol) {
+  if (!normalizedSymbol) {
     return res.status(400).json({ error: 'Stock symbol is required' });
   }
   
   try {
-    console.log(`Getting ${interval} history for:`, symbol);
+    console.log(`Getting ${interval} history for:`, normalizedSymbol);
     
     if (!API_KEY) {
       return res.status(500).json({ error: 'API key is missing' });
     }
     
-    // Map interval to Alpha Vantage function
     let timeSeriesFunction;
     switch (interval) {
       case 'daily':
@@ -146,63 +164,99 @@ exports.getStockHistory = async (req, res) => {
         timeSeriesFunction = 'TIME_SERIES_DAILY';
     }
     
-    const response = await axios.get(
-      `https://www.alphavantage.co/query?function=${timeSeriesFunction}&symbol=${symbol}&apikey=${API_KEY}`
-    );
-    
-    // Determine the time series key based on the interval
-    let timeSeriesKey;
-    switch (interval) {
-      case 'daily':
-        timeSeriesKey = 'Time Series (Daily)';
-        break;
-      case 'weekly':
-        timeSeriesKey = 'Weekly Time Series';
-        break;
-      case 'monthly':
-        timeSeriesKey = 'Monthly Time Series';
-        break;
-      default:
-        timeSeriesKey = 'Time Series (Daily)';
+    try {
+      const response = await axios.get(
+        `https://www.alphavantage.co/query?function=${timeSeriesFunction}&symbol=${normalizedSymbol}&apikey=${API_KEY}`
+      );
+      console.log(`Historical data response for ${normalizedSymbol}:`, 
+                  response.data ? 'Data received' : 'No data');
+      
+      // Check for API limit message
+      if (response.data && response.data.Note && response.data.Note.includes('API call frequency')) {
+        console.warn('API call frequency exceeded:', response.data.Note);
+        return res.status(429).json({ 
+          error: 'API rate limit reached. Please try again in a minute.',
+          symbol: normalizedSymbol,
+          interval,
+          dates: [],
+          prices: []
+        });
+      }
+      
+      let timeSeriesKey;
+      switch (interval) {
+        case 'daily':
+          timeSeriesKey = 'Time Series (Daily)';
+          break;
+        case 'weekly':
+          timeSeriesKey = 'Weekly Time Series';
+          break;
+        case 'monthly':
+          timeSeriesKey = 'Monthly Time Series';
+          break;
+        default:
+          timeSeriesKey = 'Time Series (Daily)';
+      }
+      
+      const timeSeries = response.data[timeSeriesKey];
+      
+      if (!timeSeries || Object.keys(timeSeries).length === 0) {
+        console.warn(`No time series data found for ${normalizedSymbol}`);
+        // Return empty data instead of error for better UI handling
+        return res.status(200).json({
+          symbol: normalizedSymbol,
+          interval,
+          dates: [],
+          prices: [],
+          message: 'No historical data found' // Added message for debugging
+        });
+      }
+      
+      const dates = [];
+      const prices = [];
+      
+      // Sort dates in ascending order for proper display
+      const sortedDates = Object.keys(timeSeries).sort((a, b) => new Date(a) - new Date(b));
+      // Get most recent 30 days (or all days if less than 30)
+      const recentDates = sortedDates.slice(-30);
+      
+      recentDates.forEach(date => {
+        dates.push(date);
+        prices.push(parseFloat(timeSeries[date]['4. close']));
+      });
+      
+      console.log(`Successfully processed ${dates.length} data points for ${normalizedSymbol}`);
+      
+      res.json({
+        symbol: normalizedSymbol,
+        interval,
+        dates,
+        prices,
+      });
+    } catch (axiosError) {
+      console.error(`Axios error for ${normalizedSymbol}:`, axiosError.message);
+      
+      // Provide fallback data with error message for better UI handling
+      res.status(200).json({
+        symbol: normalizedSymbol,
+        interval,
+        dates: [],
+        prices: [],
+        error: `API request failed: ${axiosError.message}`
+      });
     }
-    
-    const timeSeries = response.data[timeSeriesKey];
-    
-    if (!timeSeries || Object.keys(timeSeries).length === 0) {
-      return res.status(404).json({ error: 'Historical data not found' });
-    }
-    
-    // Convert object to arrays for easier frontend processing
-    const dates = [];
-    const prices = [];
-    
-    // Sort dates in ascending order
-    const sortedDates = Object.keys(timeSeries).sort();
-    
-    // Get the last 30 data points (or less if not available)
-    const recentDates = sortedDates.slice(-30);
-    
-    recentDates.forEach(date => {
-      dates.push(date);
-      prices.push(parseFloat(timeSeries[date]['4. close']));
-    });
-    
-    res.json({
-      symbol,
-      interval,
-      dates,
-      prices,
-    });
   } catch (err) {
     console.error('Historical data fetch failed:', err.message);
-    res.status(500).json({ error: 'Failed to fetch historical data' });
+    res.status(500).json({ 
+      error: 'Failed to fetch historical data',
+      details: err.message
+    });
   }
 };
 
 // Get market indices
 exports.getMarketIndices = async (req, res) => {
   try {
-    // Providing mock data since Alpha Vantage might not directly provide indices data
     const indices = [
       { symbol: 'NIFTY 50', price: '22,055.18', changePercent: '+0.53%' },
       { symbol: 'SENSEX', price: '72,643.21', changePercent: '+0.42%' },
@@ -217,11 +271,9 @@ exports.getMarketIndices = async (req, res) => {
   }
 };
 
-// Get trending stocks (based on volume)
+// Get trending stocks
 exports.getTrendingStocks = async (req, res) => {
   try {
-    // This would ideally come from a different endpoint or analysis
-    // For now, return placeholder data
     const trendingStocks = [
       { symbol: 'AAPL', companyName: 'Apple Inc.', latestPrice: '189.34', changePercent: '1.5%' },
       { symbol: 'TSLA', companyName: 'Tesla Inc.', latestPrice: '765.23', changePercent: '2.3%' },
@@ -239,7 +291,6 @@ exports.getTrendingStocks = async (req, res) => {
 // Get market data
 exports.getMarketData = async (req, res) => {
   try {
-    // Providing mock data since we don't have the actual database models
     const topPerformers = [
       { symbol: 'AAPL', price: '189.34', change: '1.5%' },
       { symbol: 'TSLA', price: '765.23', change: '2.3%' },
