@@ -8,7 +8,7 @@ const API_KEY = process.env.ALPHA_VANTAGE_API_KEY;
 // Buy a stock
 exports.buyStock = async (req, res) => {
   const { symbol, quantity = 1, price, takeProfit, stopLoss } = req.body;
-  const userId = req.user.id; // Assuming auth middleware sets req.user
+  const userId = req.user.id;
   
   if (!symbol || !price) {
     return res.status(400).json({ error: 'Symbol and price are required' });
@@ -24,18 +24,17 @@ exports.buyStock = async (req, res) => {
     if (!quote || Object.keys(quote).length === 0) {
       return res.status(404).json({ error: 'Stock not found' });
     }
-    
-    // Get company info
+
+    // Fetch company info
     const overviewResponse = await axios.get(
       `https://www.alphavantage.co/query?function=OVERVIEW&symbol=${symbol}&apikey=${API_KEY}`
     );
-    
     const companyName = overviewResponse.data.Name || symbol;
-    
-    // Calculate total amount
+
+    // Calculate total cost
     const totalAmount = price * quantity;
-    
-    // Create transaction
+
+    // ✅ STEP 1: Create the transaction record
     const transaction = new Transaction({
       userId,
       symbol,
@@ -44,36 +43,52 @@ exports.buyStock = async (req, res) => {
       quantity,
       price,
       totalAmount,
-      takeProfit: takeProfit || undefined,
-      stopLoss: stopLoss || undefined,
+      takeProfit,
+      stopLoss,
       status: 'COMPLETED',
       transactionDate: new Date()
     });
-    
     await transaction.save();
-    
-    // Return success
+
+    // ✅ STEP 2: Update or create portfolio record
+    let portfolio = await Portfolio.findOne({ userId });
+    if (!portfolio) {
+      portfolio = new Portfolio({
+        userId,
+        name: 'Default Portfolio',
+        stocks: []
+      });
+    }
+
+    const existingStock = portfolio.stocks.find(s => s.symbol === symbol);
+    if (existingStock) {
+      // Update existing stock entry
+      const newShares = existingStock.shares + quantity;
+      const newAvgPrice = ((existingStock.purchasePrice * existingStock.shares) + (price * quantity)) / newShares;
+      existingStock.shares = newShares;
+      existingStock.purchasePrice = newAvgPrice;
+    } else {
+      // Add new stock to portfolio
+      portfolio.stocks.push({
+        symbol,
+        shares: quantity,
+        purchasePrice: price
+      });
+    }
+
+    await portfolio.save();
+
     res.status(201).json({
       message: 'Stock purchased successfully',
-      transaction: {
-        id: transaction._id,
-        symbol,
-        companyName,
-        quantity,
-        price,
-        totalAmount,
-        takeProfit,
-        stopLoss,
-        type: 'BUY',
-        status: 'COMPLETED',
-        transactionDate: transaction.transactionDate
-      }
+      transaction,
+      portfolio
     });
   } catch (error) {
     console.error('Buy stock error:', error.message);
     res.status(500).json({ error: 'Failed to buy stock' });
   }
 };
+
 
 // Sell a stock
 exports.sellStock = async (req, res) => {

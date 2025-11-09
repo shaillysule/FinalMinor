@@ -13,6 +13,7 @@ import LearningPage from './pages/LearningPage';
 import LearningModule from './components/LearningModule';
 import ModuleDetailPage  from "./pages/ModuleDetailsPage";
 import LearningModuleAdmin from './pages/admin/LearningModuleAdmin'
+import Chatbot from "./components/Chatbot";
 function App() {
   return (
     <Router>
@@ -26,6 +27,7 @@ function App() {
         <Route path="/analytics" element={<Analytics/>}/>
         <Route path="/learning/:moduleId" element={<ModuleDetailPage />} />
         <Route path='/signup' element={<Signup/>}/> {/* Make sure this matches the import */}
+        <Route path="/chatbot" element={<Chatbot />} />
         <Route path="/admin" element={<ProtectedRoute requiredRole="admin"><AdminPanel /></ProtectedRoute>} />
         <Route path="/stock/:symbol" element={<StockDetail />} />
         <Route path="/admin/learning" element={<ProtectedRoute isAdmin={true}><LearningModuleAdmin /></ProtectedRoute>

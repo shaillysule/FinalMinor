@@ -1,192 +1,211 @@
-// // backend/controllers/chatbotController.js
-// const axios = require('axios');
-// const StockModel = require('../models/stock');
-// const PortfolioModel = require('../models/Portfolio');
-// const User = require('../models/User');
 
-// // System prompt to instruct the AI
-// const SYSTEM_PROMPT = `You are an expert stock market and financial advisor AI assistant. Your role is to provide accurate, helpful information about stocks, market trends, portfolio management, and investment strategies.
+const axios = require("axios");
+require("dotenv").config();
 
-// You have access to:
-// - Historical stock data and market performance
-// - Portfolio analysis tools
-// - Technical and fundamental analysis techniques
-// - Investment strategies and risk assessment models
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const ALPHA_VANTAGE_API_KEY = process.env.ALPHA_VANTAGE_API_KEY;
 
-// Your responses should be:
-// - Professional and knowledgeable
-// - Based on financial principles and market data
-// - Clear and concise
-// - Educational when appropriate
-// - Non-speculative and responsible (avoid making specific predictions about future stock prices)
+if (!GEMINI_API_KEY) {
+  console.error("GEMINI_API_KEY is missing!");
+  throw new Error("GEMINI_API_KEY not configured");
+}
 
-// When asked about specific stocks, use your knowledge but remind users that all investments carry risk and they should do their own research before investing.`;
+console.log("Gemini API Key loaded");
 
-// const handleStockQuery = async (req, res) => {
-//   try {
-//     const { query, conversationHistory = [] } = req.body;
-//     const userId = req.user ? req.user.id : null; // Assuming authentication middleware
-    
-//     // Gather context about the user's portfolio if authenticated
-//     let portfolioContext = '';
-//     if (userId) {
-//       try {
-//         // Get user's portfolio data
-//         const userPortfolio = await PortfolioModel.findOne({ userId }).populate('stocks');
-        
-//         if (userPortfolio && userPortfolio.stocks.length > 0) {
-//           const stocks = userPortfolio.stocks.map(stock => 
-//             `${stock.symbol}: ${stock.quantity} shares, avg price: $${stock.averagePrice}`
-//           );
-          
-//           portfolioContext = `
-// User Portfolio Context:
-// - Portfolio value: $${userPortfolio.totalValue.toFixed(2)}
-// - Performance (YTD): ${userPortfolio.ytdPerformance.toFixed(2)}%
-// - Holdings: ${stocks.join(', ')}
-// `;
-//         }
-//       } catch (err) {
-//         console.error('Error fetching portfolio data:', err);
-//         // Continue even if portfolio fetch fails
-//       }
-//     }
-    
-//     // Get market trends for context
-//     let marketContext = '';
-//     try {
-//       const topStocks = await StockModel.find().sort({ recentPerformance: -1 }).limit(3);
-//       const marketTrends = [
-//         'S&P 500: +0.3% today',
-//         'NASDAQ: +0.5% today',
-//         'Dow Jones: -0.1% today',
-//         `Top performing sector: ${topStocks[0] ? topStocks[0].sector : 'Technology'}`
-//       ];
-      
-//       marketContext = `
-// Market Context:
-// ${marketTrends.join('\n')}
-// `;
-//     } catch (err) {
-//       console.error('Error fetching market data:', err);
-//       // Continue even if market fetch fails
-//     }
-    
-//     // Combine system prompt with context
-//     const systemPromptWithContext = `${SYSTEM_PROMPT}
-// ${portfolioContext}
-// ${marketContext}`;
-    
-//     // Prepare messages for the OpenAI API
-//     const messages = [
-//       { role: 'system', content: systemPromptWithContext },
-//       ...conversationHistory.slice(-10), // Limit context to last 10 messages
-//     ];
-    
-//     // Call OpenAI API
-//     const openaiResponse = await axios.post(
-//       'https://api.openai.com/v1/chat/completions',
-//       {
-//         model: 'gpt-4',
-//         messages: messages,
-//         max_tokens: 500,
-//         temperature: 0.7,
-//       },
-//       {
-//         headers: {
-//           'Content-Type': 'application/json',
-//           'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
-//         }
-//       }
-//     );
-    
-//     // Extract and send the response
-//     const aiResponse = openaiResponse.data.choices[0].message.content;
-    
-//     // Log the interaction for analytics
-//     logInteraction(userId, query, aiResponse);
-    
-//     res.status(200).json({ response: aiResponse });
-    
-//   } catch (error) {
-//     console.error('Error in chatbot controller:', error);
-    
-//     // Handle different types of errors
-//     if (error.response && error.response.status === 429) {
-//       return res.status(429).json({ 
-//         error: 'Rate limit exceeded. Please try again in a moment.' 
-//       });
-//     }
-    
-//     if (error.response && error.response.data && error.response.data.error) {
-//       return res.status(500).json({ 
-//         error: 'AI service error. Please try again later.' 
-//       });
-//     }
-    
-//     res.status(500).json({ 
-//       error: 'Failed to process query. Please try again later.' 
-//     });
-//   }
-// };
+// Helper function to fetch real stock data
+const getStockData = async (symbol) => {
+  try {
+    const response = await axios.get(
+      `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${ALPHA_VANTAGE_API_KEY}`
+    );
+    return response.data['Global Quote'];
+  } catch (error) {
+    console.error(`Error fetching ${symbol}:`, error.message);
+    return null;
+  }
+};
 
-// // Helper function to log interactions for analytics
-// async function logInteraction(userId, query, response) {
-//   try {
-//     // Implement logging to database or analytics service
-//     console.log(`Logged interaction for user ${userId || 'anonymous'}`);
-//   } catch (err) {
-//     console.error('Error logging interaction:', err);
-//   }
-// }
+// Helper function to get market overview
+const getMarketOverview = async () => {
+  const popularStocks = ['AAPL', 'TSLA', 'GOOGL', 'MSFT', 'AMZN', 'META'];
+  const stockPromises = popularStocks.map(symbol => getStockData(symbol));
+  const results = await Promise.all(stockPromises);
+  
+  let overview = "Current Market Data:\n\n";
+  results.forEach((data, index) => {
+    if (data && data['05. price']) {
+      const symbol = popularStocks[index];
+      const price = parseFloat(data['05. price']).toFixed(2);
+      const change = data['10. change percent'];
+      overview += `${symbol}: $${price} (${change})\n`;
+    }
+  });
+  
+  return overview;
+};
 
-// module.exports = {
-//   handleStockQuery
-// };
-// backend/controllers/chatbotController.js
-const axios = require('axios');
-
-const SYSTEM_PROMPT = `You are an expert stock market AI assistant. Provide accurate, helpful information about stocks, market trends, and investment strategies. Be clear, concise, and educational. Avoid speculative predictions and always include a disclaimer that this is not financial advice.`;
+// Helper function to analyze user's portfolio
+const getUserPortfolio = async (userId) => {
+  try {
+    // Try to get user's portfolio from database
+    const Portfolio = require("../models/Portfolio");
+    const portfolio = await Portfolio.findOne({ userId });
+    
+    if (!portfolio || !portfolio.stocks || portfolio.stocks.length === 0) {
+      return "No portfolio found.";
+    }
+    
+    let portfolioSummary = "Your Current Portfolio:\n\n";
+    portfolio.stocks.forEach(stock => {
+      portfolioSummary += `${stock.symbol}: ${stock.quantity} shares @ $${stock.avgBuyPrice}\n`;
+    });
+    
+    return portfolioSummary;
+  } catch (error) {
+    console.log("Portfolio model not found or error:", error.message);
+    return ""; // Return empty string if portfolio feature not available
+  }
+};
 
 exports.handleStockQuery = async (req, res) => {
   try {
+    console.log("Received query:", req.body.query);
+
     const { query, conversationHistory = [] } = req.body;
+    const userId = req.user?.id || req.user?._id;
 
-    if (!process.env.OPENAI_API_KEY) {
-      return res.status(500).json({ error: 'OpenAI API key is not configured.' });
+    if (!query || !query.trim()) {
+      console.log("Empty query received");
+      return res.status(400).json({ error: "Query cannot be empty" });
     }
 
-    const messages = [
-      { role: 'system', content: SYSTEM_PROMPT },
-      ...conversationHistory.slice(-10),
-      { role: 'user', content: query },
-    ];
+    // Check if query is asking for stock recommendations or analysis
+    const isStockQuery = /invest|stock|buy|sell|recommend|portfolio|price|market|trading|ticker|symbol|ntpc|aapl|tsla|googl|msft|amzn|meta|nifty|sensex/i.test(query);
 
-    const openaiResponse = await axios.post(
-      'https://api.openai.com/v1/chat/completions',
-      {
-        model: 'gpt-4',
-        messages,
-        max_tokens: 500,
-        temperature: 0.7,
-      },
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-        },
+    let contextData = "";
+
+    // If it's a stock-related query, fetch real data
+    if (isStockQuery) {
+      console.log("Stock query detected, fetching market data...");
+      
+      // Get market overview
+      const marketData = await getMarketOverview();
+      if (marketData) {
+        contextData += marketData + "\n\n";
       }
-    );
-
-    let aiResponse = openaiResponse.data.choices[0].message.content;
-    aiResponse += '\n\nDisclaimer: This information is for educational purposes only and not financial advice.';
-
-    res.status(200).json({ response: aiResponse });
-  } catch (error) {
-    console.error('Error in chatbot controller:', error);
-    if (error.response && error.response.status === 429) {
-      return res.status(429).json({ error: 'Rate limit exceeded. Please try again later.' });
+      
+      // Get user's portfolio if asking about their investments
+      if (/my portfolio|my stock|my investment/i.test(query) && userId) {
+        const portfolioData = await getUserPortfolio(userId);
+        if (portfolioData) {
+          contextData += portfolioData + "\n\n";
+        }
+      }
+      
+      // Extract specific stock symbols from query (e.g., "AAPL", "TSLA", "NTPC")
+      const symbolMatches = query.match(/\b[A-Z]{2,5}\b/g);
+      if (symbolMatches && symbolMatches.length > 0) {
+        console.log("Specific symbols found:", symbolMatches);
+        for (const symbol of symbolMatches) {
+          const stockData = await getStockData(symbol);
+          if (stockData && stockData['05. price']) {
+            contextData += `${symbol} Current Data:\n`;
+            contextData += `Price: $${stockData['05. price']}\n`;
+            contextData += `Change: ${stockData['10. change percent']}\n`;
+            contextData += `Volume: ${stockData['06. volume']}\n`;
+            contextData += `High: $${stockData['03. high']}\n`;
+            contextData += `Low: $${stockData['04. low']}\n\n`;
+          }
+        }
+      }
     }
-    res.status(500).json({ error: 'Failed to process query. Please try again later.' });
+
+    // Build enhanced prompt with real data
+    let fullPrompt = `You are a professional stock market advisor and financial analyst named "NexgenStocks AI Assistant". 
+
+IMPORTANT INSTRUCTIONS:
+- When asked about stock recommendations, ALWAYS provide specific stock symbols (e.g., AAPL, TSLA, MSFT)
+- Base your recommendations on the real market data provided below
+- Consider risk tolerance and investment goals
+- Provide clear reasoning for each recommendation
+- Include current prices and price changes when discussing stocks
+- For Indian stocks (like NTPC, TCS, Reliance), mention they are NSE/BSE listed
+- If asked general non-stock questions, politely redirect to stock/finance topics
+- Be concise but informative
+- Use bullet points for clarity when listing recommendations
+
+`;
+
+    // Add real market data to context
+    if (contextData) {
+      fullPrompt += `\nREAL-TIME MARKET DATA:\n${contextData}\n`;
+    }
+
+    fullPrompt += `\nCONVERSATION HISTORY:\n`;
+    
+    if (conversationHistory.length > 0) {
+      conversationHistory.slice(-5).forEach((m) => { // Only last 5 messages for context
+        fullPrompt += `${m.role === "user" ? "User" : "Assistant"}: ${m.content}\n`;
+      });
+    }
+    
+    fullPrompt += `\nUser: ${query}\nAssistant:`;
+
+    console.log("Sending request to Gemini API with market data...");
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+
+    const requestBody = {
+      contents: [
+        {
+          parts: [
+            {
+              text: fullPrompt
+            }
+          ]
+        }
+      ],
+      generationConfig: {
+        temperature: 0.7,
+        maxOutputTokens: 2048,
+      }
+    };
+
+    const response = await axios.post(url, requestBody, {
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      timeout: 30000
+    });
+
+    console.log("Gemini API responded successfully");
+
+    const aiResponse = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+    if (!aiResponse) {
+      console.log("No text in response:", JSON.stringify(response.data));
+      throw new Error("No response text from Gemini API");
+    }
+
+    const disclaimer = "\n\n⚠️ Disclaimer: This is AI-generated advice for educational purposes only. Always do your own research and consult with a licensed financial advisor before making investment decisions.";
+
+    return res.status(200).json({
+      response: aiResponse + disclaimer,
+      hasRealData: contextData.length > 0
+    });
+
+  } catch (error) {
+    console.error("Gemini API Error:");
+    console.error("Error message:", error.message);
+    
+    if (error.response) {
+      console.error("Status:", error.response.status);
+      console.error("Response data:", JSON.stringify(error.response.data, null, 2));
+    }
+
+    return res.status(500).json({
+      error: "Failed to get AI response. Please try again.",
+      details: error.response?.data?.error?.message || error.message
+    });
   }
 };

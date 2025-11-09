@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
-
+import BuySellModal from "./BuySellModel";
 const StockDetail = () => {
   const { symbol } = useParams();
   const navigate = useNavigate();
@@ -12,7 +12,7 @@ const StockDetail = () => {
   const [error, setError] = useState(null);
   const [takeProfit, setTakeProfit] = useState("");
   const [stopLoss, setStopLoss] = useState("");
-
+   const [showBuyModal,setShowBuyModel]=useState(false);
   // Updated useEffect in stockDetail.js to handle API rate limits better
   useEffect(() => {
     const fetchStockDetail = async () => {
@@ -111,43 +111,38 @@ const StockDetail = () => {
   
     fetchStockDetail();
   }, [symbol, interval, navigate]);
-  const handleBuyStock = async () => {
-    try {
-      if (!stock.latestPrice) {
-        setError('Stock price is not available');
-        return;
-      }
-
-      const token = localStorage.getItem("token");
-      if (!token) {
-        setError('Authentication required. Please log in.');
-        navigate('/');
-        return;
-      }
-
-      const response = await axios.post(
-        "http://localhost:5000/api/portfolio/buy",
-        {
-          symbol: symbol.toUpperCase(),
-          price: stock.latestPrice,
-          takeProfit,
-          stopLoss,
-        },
-        {
-          headers: { 'x-auth-token': token },
-        }
-      );
-
-      alert("Stock bought successfully!");
-    } catch (error) {
-      console.error("Error buying stock:", error);
-      setError(error.response?.data?.error || 'Failed to buy stock');
-      if (error.response?.status === 401) {
-        localStorage.removeItem('token');
-        navigate('/');
-      }
+  const handleBuyStock = async (buyData) => {
+  try {
+    const token = localStorage.getItem("token");
+       console.log("Token exists?", !!token);
+    console.log("Token value:", token);
+    if (!token) {
+      setError('Authentication required. Please log in.');
+      navigate('/');
+      return;
     }
-  };
+
+    const response = await axios.post(
+      "http://localhost:5000/api/portfolio/buy",
+      {
+        symbol: buyData.symbol,
+        quantity: buyData.quantity,
+        price: buyData.price,
+        takeProfit: buyData.takeProfit,
+        stopLoss: buyData.stopLoss,
+      },
+      {
+        headers: { 'x-auth-token': token },
+      }
+    );
+
+    alert(`Successfully bought ${buyData.quantity} shares of ${buyData.symbol}!`);
+    setShowBuyModel(false);
+  } catch (error) {
+    console.error("Error buying stock:", error);
+    throw new Error(error.response?.data?.error || 'Failed to buy stock');
+  }
+};
 
   const handleRefresh = () => {
     const fetchStockDetail = async () => {
@@ -415,15 +410,22 @@ const LineChart = ({ data, labels }) => {
       </div>
 
       <div className="flex justify-center">
-        <button
-          onClick={handleBuyStock}
-          className="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-2xl shadow-md transition-all"
-        >
-          Buy Stock
-        </button>
+     <button
+  onClick={() => setShowBuyModel(true)}
+  className="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-2xl shadow-md transition-all"
+>
+  Buy Stock
+</button>
       </div>
 
       {error && <p className="text-red-500 mt-4 text-center">{error}</p>}
+    <BuySellModal
+    isOpen={showBuyModal}
+    onClose={()=>setShowBuyModel(false)}
+    stock={stock}
+    onBuy={handleBuyStock}
+    type="buy"
+    />
     </div>
   );
 };

@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import './Analytics.css';
 import StockAIChatbot from './StockAIChatbot';
-import ChatbotAnalytics from './ChatbotAnalytics';
+// import ChatbotAnalytics from './ChatbotAnalytics';
 
 const Analytics = () => {
   const [activeTab, setActiveTab] = useState('metrics');
@@ -106,7 +106,7 @@ const Analytics = () => {
               </div>
               <div className="analytics-column">
                 <h2>Chatbot Insights</h2>
-                <ChatbotAnalytics />
+                {/* <ChatbotAnalytics /> */}
               </div>
             </div>
           </div>

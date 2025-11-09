@@ -29,6 +29,15 @@ const adminRoutes = require('./routes/api/admin');
 const stockRoutes = require('./routes/stockRoutes');
 const chatbotRoutes = require('./routes/chatbot');
 const portfolioRoutes = require('./routes/portfolioRoutes');
+let lastRequestTime = 0;
+app.use('/api/chatbot', (req, res, next) => {
+  const now = Date.now();
+  if (now - lastRequestTime < 5000) { // 5 seconds between queries
+    return res.status(429).json({ error: 'Please wait 5 seconds between messages.' });
+  }
+  lastRequestTime = now;
+  next();
+});
 
 // Route Mounting
 app.use('/api/auth', authRoutes);

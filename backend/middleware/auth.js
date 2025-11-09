@@ -1,50 +1,49 @@
+// backend/middleware/auth.js
 const jwt = require('jsonwebtoken');
-const User = require('../models/User');
 
-module.exports = async function(req, res, next) {
+module.exports = function(req, res, next) {
+  // Get token from multiple sources
+  let token = req.header('Authorization');
+  
+  // Remove 'Bearer ' prefix if present
+  if (token && token.startsWith('Bearer ')) {
+    token = token.substring(7);
+  }
+  
+  // Also check x-auth-token header (fallback)
+  if (!token) {
+    token = req.header('x-auth-token');
+  }
+
+  console.log("Auth middleware - Token received:", token ? "YES" : "NO");
+  
+  if (token) {
+    console.log("Token preview:", token.substring(0, 20) + "...");
+  }
+
+  // Check if no token
+  if (!token) {
+    console.log("Auth middleware - No token provided");
+    return res.status(401).json({ error: 'No token, authorization denied' });
+  }
+
   try {
-    // Get token from header
-    const token = req.header('Authorization')?.replace('Bearer ', '');
-    
-    // Check if no token
-    if (!token) {
-      return res.status(401).json({ msg: 'No token, authorization denied' });
-    }
-    
-    // Verify token with proper error handling
+    // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded;
     
-    // Handle both token formats - new format has direct 'id' property,
-    // old format has 'user.id' property
-    const userId = decoded.id || (decoded.user && decoded.user.id);
-    
-    if (!userId) {
-      return res.status(401).json({ msg: 'Invalid token format' });
-    }
-    
-    // Find the user with the extracted ID
-    const user = await User.findById(userId).select('-password');
-    
-    // Validate user exists in database
-    if (!user) {
-      return res.status(401).json({ msg: 'User not found' });
-    }
-    
-    // Set user info on request object
-    req.user = {
-      id: user._id,
-      name: user.name || '',
-      email: user.email,
-      role: user.role || 'user',
-      isSubscribed: user.subscriptionActive || user.isSubscribed || false
-    };
-    
-    // Debug log for troubleshooting
-    console.log(`Auth middleware: User ${user.email} authenticated with role ${user.role}`);
-    
+    console.log(`Auth middleware: User authenticated - ID: ${decoded.id}, Email: ${decoded.email || 'N/A'}`);
     next();
   } catch (err) {
-    console.error('Auth middleware error:', err);
-    res.status(401).json({ msg: 'Token is not valid' });
+    console.error("Auth middleware - Token verification failed:", err.message);
+    
+    // Provide specific error messages
+    if (err.name === 'TokenExpiredError') {
+      return res.status(401).json({ error: 'Token has expired. Please login again.' });
+    } else if (err.name === 'JsonWebTokenError') {
+      return res.status(401).json({ error: 'Invalid token. Please login again.' });
+    }
+    
+    res.status(401).json({ error: 'Token verification failed' });
   }
 };

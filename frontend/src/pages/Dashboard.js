@@ -142,8 +142,8 @@ const Dashboard = () => {
             <Link to="/stocks" className="block p-3 rounded-md hover:bg-gray-200">
               Stocks
             </Link>
-            <Link to="/analytics" className="block p-3 rounded-md hover:bg-gray-200">
-             analytics
+            <Link to="/chatbot" className="block p-3 rounded-md hover:bg-gray-200">
+             Chatbot
             </Link>
             <Link to="/learning" className="block p-3 rounded-md hover:bg-gray-200">Learning</Link>
             {userRole === "admin" && (

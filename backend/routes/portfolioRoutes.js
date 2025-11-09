@@ -144,5 +144,62 @@ router.delete('/:id', auth, async (req, res) => {
     res.status(500).json({ msg: 'Server error' });
   }
 });
+// --- BUY STOCK ---
+router.post('/buy', auth, async (req, res) => {
+  try {
+    console.log("Buy request received");
+    console.log("User:", req.user);  // From auth middleware
+    console.log("Body:", req.body);
+    const { symbol, quantity, price, takeProfit, stopLoss } = req.body;
+    
+    // Save to database or localStorage
+    // Your implementation here
+      if (!symbol || !quantity || !price) {
+      return res.status(400).json({ 
+        error: 'Missing required fields: symbol, quantity, price' 
+      });
+    }
+    res.json({ 
+      success: true, 
+      message: 'Stock purchased successfully',
+      purchase: { symbol, quantity, price, takeProfit, stopLoss }
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- SELL STOCK ---
+router.post('/sell', auth, async (req, res, next) => {
+  try {
+    const portfolioController = require('../controllers/portfolioController');
+    return portfolioController.sellStock(req, res);
+  } catch (err) {
+    console.error('Error in /api/portfolio/sell route:', err.message);
+    res.status(500).json({ error: 'Server error while selling stock' });
+  }
+});
+
+// --- GET USER PORTFOLIO ---
+router.get('/my', auth, async (req, res, next) => {
+  try {
+    const portfolioController = require('../controllers/portfolioController');
+    return portfolioController.getPortfolio(req, res);
+  } catch (err) {
+    console.error('Error in /api/portfolio/my route:', err.message);
+    res.status(500).json({ error: 'Failed to fetch user portfolio' });
+  }
+});
+
+// --- GET TRANSACTION HISTORY ---
+router.get('/transactions', auth, async (req, res, next) => {
+  try {
+    const portfolioController = require('../controllers/portfolioController');
+    return portfolioController.getTransactionHistory(req, res);
+  } catch (err) {
+    console.error('Error in /api/portfolio/transactions route:', err.message);
+    res.status(500).json({ error: 'Failed to fetch transaction history' });
+  }
+});
 
 module.exports = router;
