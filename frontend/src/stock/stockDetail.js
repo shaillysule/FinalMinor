@@ -14,6 +14,8 @@ const StockDetail = () => {
   const [stopLoss, setStopLoss] = useState("");
    const [showBuyModal,setShowBuyModel]=useState(false);
   // Updated useEffect in stockDetail.js to handle API rate limits better
+     const BASE_URL = process.env.REACT_APP_API_URL;
+
   useEffect(() => {
     const fetchStockDetail = async () => {
       try {
@@ -39,7 +41,7 @@ const StockDetail = () => {
         // Attempt to fetch new stock data or use cached data
         try {
           const stockResponse = await axios.get(
-            `http://localhost:5000/api/stocks/${normalizedSymbol}`, 
+            `${BASE_URL}/api/stocks/${normalizedSymbol}`, 
             { headers }
           );
           console.log('Stock response:', stockResponse.data);
@@ -64,7 +66,7 @@ const StockDetail = () => {
         // Attempt to fetch history data or use cached data
         try {
           const historyResponse = await axios.get(
-            `http://localhost:5000/api/stocks/${normalizedSymbol}/history?interval=${interval}`, 
+            `${BASE_URL}/api/stocks/${normalizedSymbol}/history?interval=${interval}`, 
             { headers }
           );
           console.log('History response:', historyResponse.data);
@@ -123,7 +125,7 @@ const StockDetail = () => {
     }
 
     const response = await axios.post(
-      "http://localhost:5000/api/portfolio/buy",
+      `${BASE_URL}/api/portfolio/buy`,
       {
         symbol: buyData.symbol,
         quantity: buyData.quantity,
@@ -158,11 +160,11 @@ const StockDetail = () => {
         const normalizedSymbol = symbol.toUpperCase();
         console.log('Refreshing stock details for:', normalizedSymbol);
 
-        const stockResponse = await axios.get(`http://localhost:5000/api/stocks/${normalizedSymbol}`, { headers });
+        const stockResponse = await axios.get(`${BASE_URL}/api/stocks/${normalizedSymbol}`, { headers });
         console.log('Stock response:', stockResponse.data);
         setStock(stockResponse.data || {});
 
-        const historyResponse = await axios.get(`http://localhost:5000/api/stocks/${normalizedSymbol}/history?interval=${interval}`, { headers });
+        const historyResponse = await axios.get(`${BASE_URL}/api/stocks/${normalizedSymbol}/history?interval=${interval}`, { headers });
         console.log('History response:', historyResponse.data);
         setChartData({
           dates: historyResponse.data.dates || [],

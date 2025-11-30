@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
+   const BASE_URL = process.env.REACT_APP_API_URL;
 
 const AdminPanel = () => {
   const [users, setUsers] = useState([]);
@@ -19,7 +20,7 @@ const AdminPanel = () => {
           return;
         }
         
-        const res = await axios.get("http://localhost:5000/api/admin/users", {
+        const res = await axios.get(`${BASE_URL}/api/admin/users`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },

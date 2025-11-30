@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { motion } from 'framer-motion';
+   const BASE_URL = process.env.REACT_APP_API_URL;
 
 const StocksOverview = () => {
   const [stocks, setStocks] = useState([]);
@@ -13,7 +14,9 @@ const StocksOverview = () => {
         const symbols = ['AAPL', 'TSLA', 'GOOGL'];
         const stockData = await Promise.all(
           symbols.map(symbol =>
-            axios.get(`http://localhost:5000/api/stocks/${symbol}`, {
+            // axios.get(`http://localhost:5000/api/stocks/${symbol}`, {
+                        axios.get(`${BASE_URL}/api/stocks/${symbol}`, {
+
               headers: { 'x-auth-token': localStorage.getItem('token') }
             }).then(res => res.data)
           )

@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
 import './styles.css';
+   const BASE_URL = process.env.REACT_APP_API_URL;
 
 // Set the base URL for Axios to the backend
-axios.defaults.baseURL = 'http://localhost:5000';
+axios.defaults.baseURL = `${BASE_URL}`;
 
 const LearningPage = () => {
   const [modules, setModules] = useState([]);

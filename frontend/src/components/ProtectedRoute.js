@@ -1,9 +1,13 @@
 import React, { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import axios from "axios";
+const BASE_URL = process.env.REACT_APP_API_URL;
+
 
 const ProtectedRoute = ({ children, requiredRole }) => {
   const [isAuthorized, setIsAuthorized] = useState(null);
+   const BASE_URL = process.env.REACT_APP_API_URL;
+
 
   useEffect(() => {
     const verifyUser = async () => {
@@ -15,7 +19,7 @@ const ProtectedRoute = ({ children, requiredRole }) => {
         }
 
         // Get the user info to check their role
-        const response = await axios.get("http://localhost:5000/api/auth/me", {
+        const response = await axios.get(`${BASE_URL}/api/auth/me`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },

@@ -64,7 +64,7 @@ function Chatbot() {
       const token = localStorage.getItem("token");
 
       const res = await axios.post(
-        "http://localhost:5000/api/chatbot/stock",
+        "https://nexgenstocksbackend.onrender.com/api/chatbot/stock",
         {
           query: messageText,
           conversationHistory: messages.map((msg) => ({

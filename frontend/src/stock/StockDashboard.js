@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import './StockDashboard.css';
 import StockCard from './StockCard';
-
+   const BASE_URL = process.env.REACT_APP_API_URL;
 const StockDashboard = () => {
   const [stockData, setStockData] = useState([]);
   const [indices, setIndices] = useState([]);
@@ -27,9 +27,9 @@ const StockDashboard = () => {
         const headers = { 'x-auth-token': token };
 
         const [stocksResponse, indicesResponse, trendingResponse] = await Promise.all([
-          axios.get('http://localhost:5000/api/stocks', { headers }),
-          axios.get('http://localhost:5000/api/stocks/indices/market', { headers }),
-          axios.get('http://localhost:5000/api/stocks/trending/stocks', { headers })
+          axios.get(`${BASE_URL}/api/stocks`, { headers }),
+          axios.get(`${BASE_URL}/api/stocks/indices/market`, { headers }),
+          axios.get(`${BASE_URL}/api/stocks/trending/stocks`, { headers })
         ]);
 
         setStockData(stocksResponse.data);
