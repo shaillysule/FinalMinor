@@ -46,8 +46,9 @@ app.use('/api/user', userRoutes);
 app.use('/api/subscription', paymentRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/stocks', stockRoutes);
-app.use('/api/portfolio', portfolioRoutes);
+app.use('/api/portfolios', portfolioRoutes);
 app.use('/api/chatbot', chatbotRoutes);
+app.use('/api/portfolio', require('./routes/portfolio'));
 
 // Serve static assets in production
 if (process.env.NODE_ENV === 'production') {

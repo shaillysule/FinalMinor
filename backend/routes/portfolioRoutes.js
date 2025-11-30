@@ -1,46 +1,32 @@
-
+// routes/portfolioRoutes.js  (Portfolio Management ONLY)
 const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
 const Portfolio = require('../models/Portfolio');
 const { calculateRiskMetrics } = require('../utils/riskCalculator');
 
-// Update risk metrics for a portfolio
+// Update risk metrics
 router.post('/:portfolioId/update-risk', auth, async (req, res) => {
   try {
-    let portfolio = await Portfolio.findById(req.params.portfolioId);
-    
-    if (!portfolio) {
-      return res.status(404).json({ msg: 'Portfolio not found' });
-    }
-    
-    // Check if the portfolio belongs to the user or user is admin
-    if (portfolio.userId.toString() !== req.user.id && req.user.role !== 'admin') {
+    const portfolio = await Portfolio.findById(req.params.portfolioId);
+    if (!portfolio) return res.status(404).json({ msg: 'Portfolio not found' });
+
+    if (portfolio.userId.toString() !== req.user.id && req.user.role !== 'admin')
       return res.status(403).json({ msg: 'Not authorized' });
-    }
-    
-    // Calculate risk metrics
+
     const riskMetrics = await calculateRiskMetrics(portfolio);
-    
-    if (!riskMetrics) {
-      return res.status(500).json({ msg: 'Failed to calculate risk metrics' });
-    }
-    
-    // Update portfolio with risk metrics
     portfolio.riskMetrics = riskMetrics;
     await portfolio.save();
-    
+
     res.json(portfolio);
+
   } catch (error) {
     console.error(error.message);
     res.status(500).json({ msg: 'Server error' });
   }
 });
 
-// Add other portfolio routes here
-// For example:
-
-// Get all portfolios for the current user
+// Get all portfolios of logged-in user
 router.get('/', auth, async (req, res) => {
   try {
     const portfolios = await Portfolio.find({ userId: req.user.id });
@@ -51,154 +37,83 @@ router.get('/', auth, async (req, res) => {
   }
 });
 
-// Create a new portfolio
+// Create portfolio
 router.post('/', auth, async (req, res) => {
   try {
     const { name, description, riskLevel } = req.body;
-    
-    const newPortfolio = new Portfolio({
+
+    const portfolio = new Portfolio({
       userId: req.user.id,
       name,
       description,
       riskLevel: riskLevel || 'moderate'
     });
-    
-    const portfolio = await newPortfolio.save();
+
+    await portfolio.save();
     res.json(portfolio);
+
   } catch (error) {
     console.error(error.message);
     res.status(500).json({ msg: 'Server error' });
   }
 });
 
-// Get a specific portfolio
+// Get specific portfolio
 router.get('/:id', auth, async (req, res) => {
   try {
     const portfolio = await Portfolio.findById(req.params.id);
-    
-    if (!portfolio) {
-      return res.status(404).json({ msg: 'Portfolio not found' });
-    }
-    
-    // Check if the portfolio belongs to the user or user is admin
-    if (portfolio.userId.toString() !== req.user.id && req.user.role !== 'admin') {
+    if (!portfolio) return res.status(404).json({ msg: 'Portfolio not found' });
+
+    if (portfolio.userId.toString() !== req.user.id && req.user.role !== 'admin')
       return res.status(403).json({ msg: 'Not authorized' });
-    }
-    
+
     res.json(portfolio);
+
   } catch (error) {
     console.error(error.message);
     res.status(500).json({ msg: 'Server error' });
   }
 });
 
-// Update a portfolio
+// Update portfolio data
 router.put('/:id', auth, async (req, res) => {
   try {
     const { name, description, riskLevel } = req.body;
-    
-    let portfolio = await Portfolio.findById(req.params.id);
-    
-    if (!portfolio) {
-      return res.status(404).json({ msg: 'Portfolio not found' });
-    }
-    
-    // Check if the portfolio belongs to the user or user is admin
-    if (portfolio.userId.toString() !== req.user.id && req.user.role !== 'admin') {
+
+    const portfolio = await Portfolio.findById(req.params.id);
+    if (!portfolio) return res.status(404).json({ msg: 'Portfolio not found' });
+
+    if (portfolio.userId.toString() !== req.user.id && req.user.role !== 'admin')
       return res.status(403).json({ msg: 'Not authorized' });
-    }
-    
-    // Update fields
-    if (name) portfolio.name = name;
-    if (description) portfolio.description = description;
-    if (riskLevel) portfolio.riskLevel = riskLevel;
-    
+
+    portfolio.name = name || portfolio.name;
+    portfolio.description = description || portfolio.description;
+    portfolio.riskLevel = riskLevel || portfolio.riskLevel;
+
     await portfolio.save();
-    
     res.json(portfolio);
+
   } catch (error) {
     console.error(error.message);
     res.status(500).json({ msg: 'Server error' });
   }
 });
 
-// Delete a portfolio
+// Delete portfolio
 router.delete('/:id', auth, async (req, res) => {
   try {
     const portfolio = await Portfolio.findById(req.params.id);
-    
-    if (!portfolio) {
-      return res.status(404).json({ msg: 'Portfolio not found' });
-    }
-    
-    // Check if the portfolio belongs to the user or user is admin
-    if (portfolio.userId.toString() !== req.user.id && req.user.role !== 'admin') {
+    if (!portfolio) return res.status(404).json({ msg: 'Portfolio not found' });
+
+    if (portfolio.userId.toString() !== req.user.id && req.user.role !== 'admin')
       return res.status(403).json({ msg: 'Not authorized' });
-    }
-    
-    await portfolio.remove();
-    
+
+    await portfolio.deleteOne();
     res.json({ msg: 'Portfolio removed' });
+
   } catch (error) {
     console.error(error.message);
     res.status(500).json({ msg: 'Server error' });
-  }
-});
-// --- BUY STOCK ---
-router.post('/buy', auth, async (req, res) => {
-  try {
-    console.log("Buy request received");
-    console.log("User:", req.user);  // From auth middleware
-    console.log("Body:", req.body);
-    const { symbol, quantity, price, takeProfit, stopLoss } = req.body;
-    
-    // Save to database or localStorage
-    // Your implementation here
-      if (!symbol || !quantity || !price) {
-      return res.status(400).json({ 
-        error: 'Missing required fields: symbol, quantity, price' 
-      });
-    }
-    res.json({ 
-      success: true, 
-      message: 'Stock purchased successfully',
-      purchase: { symbol, quantity, price, takeProfit, stopLoss }
-    });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// --- SELL STOCK ---
-router.post('/sell', auth, async (req, res, next) => {
-  try {
-    const portfolioController = require('../controllers/portfolioController');
-    return portfolioController.sellStock(req, res);
-  } catch (err) {
-    console.error('Error in /api/portfolio/sell route:', err.message);
-    res.status(500).json({ error: 'Server error while selling stock' });
-  }
-});
-
-// --- GET USER PORTFOLIO ---
-router.get('/my', auth, async (req, res, next) => {
-  try {
-    const portfolioController = require('../controllers/portfolioController');
-    return portfolioController.getPortfolio(req, res);
-  } catch (err) {
-    console.error('Error in /api/portfolio/my route:', err.message);
-    res.status(500).json({ error: 'Failed to fetch user portfolio' });
-  }
-});
-
-// --- GET TRANSACTION HISTORY ---
-router.get('/transactions', auth, async (req, res, next) => {
-  try {
-    const portfolioController = require('../controllers/portfolioController');
-    return portfolioController.getTransactionHistory(req, res);
-  } catch (err) {
-    console.error('Error in /api/portfolio/transactions route:', err.message);
-    res.status(500).json({ error: 'Failed to fetch transaction history' });
   }
 });
 

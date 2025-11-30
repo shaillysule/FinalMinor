@@ -187,10 +187,10 @@ IMPORTANT INSTRUCTIONS:
       throw new Error("No response text from Gemini API");
     }
 
-    const disclaimer = "\n\n⚠️ Disclaimer: This is AI-generated advice for educational purposes only. Always do your own research and consult with a licensed financial advisor before making investment decisions.";
+    // const disclaimer = "\n\n⚠️ Disclaimer: This is AI-generated advice for educational purposes only. Always do your own research and consult with a licensed financial advisor before making investment decisions.";
 
     return res.status(200).json({
-      response: aiResponse + disclaimer,
+      response: aiResponse ,
       hasRealData: contextData.length > 0
     });
 

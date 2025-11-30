@@ -2,7 +2,7 @@
 const Transaction = require('../models/BuySellModel');
 const User = require('../models/User'); // Assuming you have a User model
 const axios = require('axios');
-
+const Portfolio=require("../models/Portfolio");
 const API_KEY = process.env.ALPHA_VANTAGE_API_KEY;
 
 // Buy a stock
@@ -91,72 +91,53 @@ exports.buyStock = async (req, res) => {
 
 
 // Sell a stock
+// SELL STOCK
 exports.sellStock = async (req, res) => {
-  const { symbol, quantity = 1, price } = req.body;
-  const userId = req.user.id;
-  
-  if (!symbol || !price) {
-    return res.status(400).json({ error: 'Symbol and price are required' });
-  }
-  
   try {
-    // Check if user owns the stock
-    const userStocks = await Transaction.aggregate([
-      { $match: { userId: userId, symbol, type: 'BUY', status: 'COMPLETED' } },
-      { $group: { _id: '$symbol', totalQuantity: { $sum: '$quantity' } } }
-    ]);
-    
-    const userStock = userStocks.find(stock => stock._id === symbol);
-    if (!userStock || userStock.totalQuantity < quantity) {
-      return res.status(400).json({ error: 'Insufficient stock quantity to sell' });
+    let { symbol, quantity, price } = req.body;
+
+    // Fix: normalize data
+    symbol = symbol.toUpperCase();
+    quantity = Number(quantity);
+    price = Number(price);
+
+    if (!symbol || !quantity || !price) {
+      return res.status(400).json({ msg: "Missing required fields" });
     }
-    
-    // Get company info
-    const overviewResponse = await axios.get(
-      `https://www.alphavantage.co/query?function=OVERVIEW&symbol=${symbol}&apikey=${API_KEY}`
-    );
-    
-    const companyName = overviewResponse.data.Name || symbol;
-    
-    // Calculate total amount
-    const totalAmount = price * quantity;
-    
-    // Create transaction
-    const transaction = new Transaction({
-      userId,
-      symbol,
-      companyName,
-      type: 'SELL',
-      quantity,
-      price,
-      totalAmount,
-      status: 'COMPLETED',
-      transactionDate: new Date()
+
+    let portfolio = await Portfolio.findOne({ userId: req.user.id });
+    if (!portfolio) return res.status(404).json({ msg: "Portfolio not found" });
+
+    const holding = portfolio.stocks.find(s => s.symbol === symbol);
+    if (!holding) return res.status(400).json({ msg: "Stock not found in portfolio" });
+
+    if (holding.quantity < quantity) {
+      return res.status(400).json({ msg: "Not enough shares to sell" });
+    }
+
+    // Subtract quantity from holding
+    holding.quantity -= quantity;
+
+    // If everything sold → remove stock
+    if (holding.quantity === 0) {
+      portfolio.stocks = portfolio.stocks.filter(s => s.symbol !== symbol);
+    }
+
+    // Update values
+    holding.currentValue = holding.quantity * holding.avgBuyPrice;
+
+    await portfolio.save();
+
+    return res.json({
+      msg: "Stock sold successfully",
+      portfolio
     });
-    
-    await transaction.save();
-    
-    // Return success
-    res.status(201).json({
-      message: 'Stock sold successfully',
-      transaction: {
-        id: transaction._id,
-        symbol,
-        companyName,
-        quantity,
-        price,
-        totalAmount,
-        type: 'SELL',
-        status: 'COMPLETED',
-        transactionDate: transaction.transactionDate
-      }
-    });
-  } catch (error) {
-    console.error('Sell stock error:', error.message);
-    res.status(500).json({ error: 'Failed to sell stock' });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ msg: "Server error" });
   }
 };
-
 // Get user portfolio
 exports.getPortfolio = async (req, res) => {
   const userId = req.user.id;

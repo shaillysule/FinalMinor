@@ -41,9 +41,9 @@ const BuySellModal = ({
 
     try {
       await onBuy({
-        symbol: stock.symbol,
-        quantity: parseInt(quantity),
-        price: price,
+        symbol: stock.symbol.toUpperCase(),
+        quantity:Number(quantity),
+        price: stock.latestPrice,
         takeProfit: takeProfit ? parseFloat(takeProfit) : null,
         stopLoss: stopLoss ? parseFloat(stopLoss) : null,
         totalCost: parseFloat(totalCost)
@@ -72,7 +72,7 @@ const BuySellModal = ({
           onClick={onClose}
         >
           <motion.div
-            initial={{ scale: 0.9, y: 20 }}
+            initial={{ scale: 0.9, y : 20 }}
             animate={{ scale: 1, y: 0 }}
             exit={{ scale: 0.9, y: 20 }}
             className="bg-gray-900 rounded-2xl p-6 max-w-md w-full shadow-2xl"
@@ -90,6 +90,7 @@ const BuySellModal = ({
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
+                
               </button>
             </div>
 
