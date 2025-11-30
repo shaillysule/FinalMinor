@@ -7,7 +7,6 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-const path = require('path');
 
 dotenv.config();
 
@@ -17,8 +16,6 @@ const app = express();
 //      CORRECT CORS SETUP
 // =============================
 
-
-
 const allowedOrigins = [
   "https://nexgenstocksfrontend.onrender.com",
   "http://localhost:3000"
@@ -27,36 +24,47 @@ const allowedOrigins = [
 app.use(
   cors({
     origin: function (origin, callback) {
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (!origin || allowedOrigins.includes(origin) || !origin) {
         callback(null, true);
       } else {
+        console.log("❌ CORS BLOCKED:", origin);
         callback(new Error("Not allowed by CORS"));
       }
     },
     credentials: true,
-    methods: "GET, POST, PUT, DELETE, PATCH, OPTIONS",
+    methods: "GET,POST,PUT,DELETE,PATCH,OPTIONS",
     allowedHeaders: [
       "Content-Type",
       "Authorization",
-      "x-auth-token"   // ⭐ THIS FIXES ALL YOUR ERRORS
-    ],
+      "x-auth-token"
+    ]
   })
 );
 
 app.options("*", cors());
-
 
 // =============================
 //      MIDDLEWARES
 // =============================
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
-app.use(helmet());
 
-app.use(rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100
-}));
+// Helmet with relaxed security (to allow CORS)
+app.use(
+  helmet({
+    crossOriginResourcePolicy: false,
+    crossOriginOpenerPolicy: false,
+    contentSecurityPolicy: false,
+  })
+);
+
+// Rate limiting
+app.use(
+  rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 300,
+  })
+);
 
 // =============================
 //      IMPORT ROUTES
@@ -99,13 +107,6 @@ app.use('/api/stocks', stockRoutes);
 app.use('/api/chatbot', chatbotRoutes);
 app.use('/api/portfolios', portfolioRoutes);
 app.use('/api/portfolio', portfoliosTrade);
-
-// =============================
-//      REMOVE WRONG CLIENT CODE
-// (Frontend is deployed separately on Render)
-//
-// ❌ DO NOT SERVE client/build FROM BACKEND IN RENDER
-// =============================
 
 // =============================
 //      DEFAULT ROUTE
