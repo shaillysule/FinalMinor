@@ -17,9 +17,11 @@ const app = express();
 //      CORRECT CORS SETUP
 // =============================
 
+
+
 const allowedOrigins = [
-  "https://nexgenstocksfrontend.onrender.com",  // your frontend
-  "http://localhost:3000"                       // local dev
+  "https://nexgenstocksfrontend.onrender.com",
+  "http://localhost:3000"
 ];
 
 app.use(
@@ -28,18 +30,21 @@ app.use(
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
-        console.log("❌ CORS BLOCKED:", origin);
         callback(new Error("Not allowed by CORS"));
       }
     },
     credentials: true,
-    methods: "GET,POST,PUT,DELETE,PATCH,OPTIONS",
-    allowedHeaders: "Content-Type,Authorization"
+    methods: "GET, POST, PUT, DELETE, PATCH, OPTIONS",
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "x-auth-token"   // ⭐ THIS FIXES ALL YOUR ERRORS
+    ],
   })
 );
 
-// Preflight support
 app.options("*", cors());
+
 
 // =============================
 //      MIDDLEWARES
